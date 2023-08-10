@@ -118,6 +118,22 @@ class DumpFileLoader:
                 return mol
         print('Molecule type with given name is not defined.')
 
+    def get_coordinates_array(self):
+        '''Get arrays of coordinates loaded from the dump file grouped by timestep.'''
+
+        # Select only coordinates but allow for different types
+        target_coord_names = ['x', 'y', 'z', 'xs', 'ys', 'zs', 'xu', 'yu', 'zu']
+        names_found = sorted([coordinate for coordinate in self.data_dict.keys() if coordinate in target_coord_names])
+        coordinates_dict = {}
+
+        for timestep_idx, timestep in enumerate(self.timesteps):
+            array = np.empty(shape=(self.natoms,0))
+            for coordinate in names_found:
+                array = np.concatenate((array, self.data_dict[coordinate][timestep_idx][:,np.newaxis]), axis=1)
+            coordinates_dict[timestep] = array
+    
+        return coordinates_dict
+
         
     def recognize_molecules(self, mols_by_atom_types, molnames=None):
         '''Recognize molecule types using provided atom types. Works only if each molecule is defined by separate set of atom types, not overlapping with other molecules.
