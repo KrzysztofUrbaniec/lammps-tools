@@ -124,17 +124,30 @@ class DumpFileLoader:
         # Select only coordinates but allow for different types
         target_coord_names = ['x', 'y', 'z', 'xs', 'ys', 'zs', 'xu', 'yu', 'zu']
         names_found = sorted([coordinate for coordinate in self.data_dict.keys() if coordinate in target_coord_names])
-        coordinates_dict = {}
+        coordinates_dict = self._populate_timestep_grouped_arrays(names_found)
+        return coordinates_dict
+    
+    def get_custom_array(self, property_names):
+        '''Get arrays consisting of selected properties and gropued by timestep.
+        
+        Parameters:
+        ------------------------
+        :param property_names: A list containing properties that should be assembled into an array. The order of properties in the list corresponds to the order of columns in the array
+        '''
 
+        if not isinstance(property_names, list): raise TypeError('property_names accepts only lists.')
+        property_dict = self._populate_timestep_grouped_arrays(property_names)
+        return property_dict
+    
+    def _populate_timestep_grouped_arrays(self, items):
+        item_dict = {}
         for timestep_idx, timestep in enumerate(self.timesteps):
             array = np.empty(shape=(self.natoms,0))
-            for coordinate in names_found:
-                array = np.concatenate((array, self.data_dict[coordinate][timestep_idx][:,np.newaxis]), axis=1)
-            coordinates_dict[timestep] = array
-    
-        return coordinates_dict
+            for item in items:
+                array = np.concatenate((array, self.data_dict[item][timestep_idx][:,np.newaxis]), axis=1)
+            item_dict[timestep] = array
+        return item_dict
 
-        
     def recognize_molecules(self, mols_by_atom_types, molnames=None):
         '''Recognize molecule types using provided atom types. Works only if each molecule is defined by separate set of atom types, not overlapping with other molecules.
         Atom types are paired with molecule names in the same order as they appear in arguments of the method. Each molecule type is stored as an object of separate class.
