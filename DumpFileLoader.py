@@ -87,7 +87,7 @@ class DumpFileLoader:
             else:
                 self.data_dict[keyword] = np.empty(shape=(0,self.natoms))
                 
-    def get_property(self, name):
+    def get_property(self, name: str) -> np.array:
         '''Get an array of selected property values collected from dump file and grouped by timestep.
         If the array is A, then element A(i,j) gives value of selected property for j-th atom at i-th timestep.
         
@@ -104,7 +104,7 @@ class DumpFileLoader:
             print("Entered property doesn't exist.")
             return None
 
-    def get_molecule_type(self, molname):
+    def get_molecule_type(self, molname: str) -> MoleculeType: 
         '''Get molecule type using previously defined molecule name.
         
         Parameters:
@@ -119,7 +119,7 @@ class DumpFileLoader:
                 return mol
         print('Molecule type with given name is not defined.')
 
-    def get_coordinates_array(self):
+    def get_coordinates_array(self) -> dict:
         '''Get arrays of coordinates loaded from the dump file grouped by timestep.'''
 
         # Select only coordinates but allow for different types
@@ -128,7 +128,7 @@ class DumpFileLoader:
         coordinates_dict = self._populate_timestep_grouped_arrays(names_found)
         return coordinates_dict
     
-    def get_custom_array(self, property_names):
+    def get_custom_array(self, property_names: list) -> dict:
         '''Get arrays consisting of selected properties and grouped by timestep.
         
         Parameters:
@@ -149,7 +149,7 @@ class DumpFileLoader:
             item_dict[timestep] = array
         return item_dict
 
-    def recognize_molecules(self, mols_by_atom_types, molnames=None):
+    def recognize_molecules(self, mols_by_atom_types: list, molnames: list = None) -> None:
         '''Recognize molecule types using provided atom types. Works only if each molecule is defined by separate set of atom types, not overlapping with other molecules.
         Atom types are paired with molecule names in the same order as they appear in arguments of the method. Each molecule type is stored as an object of separate class.
         These objects can be requested by user with get_molecule_type() method.
@@ -171,11 +171,11 @@ class DumpFileLoader:
         if len(molnames) != len(set(molnames)):
             raise Exception('All molnames must be unique.')
 
-        # If this function was used before and is used once again, erase previously created keys
+        # If this function had been used before and is used once again, erase previously created keys
         if len(self.molecule_types) != 0:
             self.molecule_types = []
 
-        # Check data type consistence
+        # Check consistence of data types 
         if not isinstance(molnames, (list,tuple)) and molnames is not None:
             raise TypeError('"molnames" accepts only lists or tuples.')
         if not isinstance(mols_by_atom_types, (tuple, list)):
@@ -199,7 +199,7 @@ class DumpFileLoader:
             if 'mol' in self.data_dict.keys():
                 moltype.nummols = len(np.unique(moltype.data_dict['mol'][0]))
             
-    def save_dump_state(self, filename):
+    def save_dump_state(self, filename: str) -> None:
         '''Serialize dump object and save it to a .pkl file.
         
         Parameters:
@@ -213,7 +213,7 @@ class DumpFileLoader:
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
             
-    def load_saved_state(filepath):
+    def load_saved_state(filepath: str):
         '''Deserialize dump object and load previously saved state. The method is provided with
         class for convenience, but it can load any serialized .pkl object and is not restriced to dump objects.
         
