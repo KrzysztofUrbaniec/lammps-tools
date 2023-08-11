@@ -62,13 +62,14 @@ def convert_to_com(dump_obj: DumpFileLoader, type_to_mass_map: dict = None) -> N
     
     ### END CHECKS ###
 
+    com_list = ['COM_x', 'COM_y', 'COM_z']
+
     for moltype in dump_obj.molecule_types:
         # logging.debug(moltype.data_dict.keys())
         
-        moltype.data_dict['COM_x'] = np.empty(shape=(0,moltype.nummols))
-        moltype.data_dict['COM_y'] = np.empty(shape=(0,moltype.nummols))
-        moltype.data_dict['COM_z'] = np.empty(shape=(0,moltype.nummols))
-
+        for com_name in com_list:
+            moltype.data_dict[com_name] = np.empty(shape=(0,moltype.nummols))
+        
         print(f'Computing COM for molecules of type: {moltype.name}')
         
         for timestep_idx in range(len(dump_obj.timesteps)):
@@ -92,9 +93,9 @@ def convert_to_com(dump_obj: DumpFileLoader, type_to_mass_map: dict = None) -> N
                 
             print_progress_bar(iteration=timestep_idx+1, total=len(dump_obj.timesteps))
             
-            moltype.data_dict['COM_x'] = np.r_[moltype.data_dict['COM_x'], com_array[:,0][np.newaxis,:]]
-            moltype.data_dict['COM_y'] = np.r_[moltype.data_dict['COM_y'], com_array[:,1][np.newaxis,:]]
-            moltype.data_dict['COM_z'] = np.r_[moltype.data_dict['COM_z'], com_array[:,2][np.newaxis,:]]
+            for i, com_name in enumerate(com_list):
+                moltype.data_dict[com_name] = np.r_[moltype.data_dict[com_name], com_array[:,i][np.newaxis,:]]
+            
         print('')
 
 def recognize_coordinate(moltype: DumpFileLoader.MoleculeType, timestep_idx: int, target_coord_names: list) -> np.array:
