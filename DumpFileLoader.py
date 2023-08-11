@@ -20,6 +20,7 @@ class DumpFileLoader:
             self.data_dict = {}
             self.name = name
             self.atom_types = atom_types
+            self.nummols = None
 
     def __init__(self, input_file, _sort_by_id=True):
         self.data_dict = {}
@@ -128,7 +129,7 @@ class DumpFileLoader:
         return coordinates_dict
     
     def get_custom_array(self, property_names):
-        '''Get arrays consisting of selected properties and gropued by timestep.
+        '''Get arrays consisting of selected properties and grouped by timestep.
         
         Parameters:
         ------------------------
@@ -195,6 +196,8 @@ class DumpFileLoader:
             for keyword in self.data_dict.keys():
                 atom_types_mask = np.isin(self.data_dict['type'][0], atom_types)
                 moltype.data_dict[keyword] = self.data_dict[keyword][:,atom_types_mask]
+            if 'mol' in self.data_dict.keys():
+                moltype.nummols = len(np.unique(moltype.data_dict['mol'][0]))
             
     def save_dump_state(self, filename):
         '''Serialize dump object and save it to a .pkl file.
