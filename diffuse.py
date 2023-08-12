@@ -1,8 +1,12 @@
 import numpy as np
 import statsmodels.api as sm
 from DumpFileLoader import DumpFileLoader
+import logging
+import sys
 
-def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, type='com'):
+logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, step_origin=10, type='com'):
     # ----------------------------- 
     # Curently allows to compute MSD for center-of-mass of molecules
     # -----------------------------
@@ -13,19 +17,18 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, type='c
     # elif n_origin > len(moltype_obj.timesteps) // 2:
     #     raise ValueError('n_origin cannot exceed half the number of timesteps ')
 
-    MSD = np.zeros(shape=(n_steps, n_origin))
+    origins = np.arange(0,n_origin,step_origin,dtype=int)
 
-    # Currently origins are all timesteps from the beginning of the simulation up to n_origin
-    origins = moltype_obj.timesteps[:n_origin]
+    MSD = np.zeros(shape=(n_steps, len(origins)))
 
-    for i in range(len(origins)):
-        x_origin = moltype_obj.data_dict['COM_x'][i][:,np.newaxis]
-        y_origin = moltype_obj.data_dict['COM_y'][i][:,np.newaxis]
-        z_origin = moltype_obj.data_dict['COM_z'][i][:,np.newaxis]
+    for i, step_origin in enumerate(origins):
+        x_origin = moltype_obj.data_dict['COM_x'][step_origin][:,np.newaxis]
+        y_origin = moltype_obj.data_dict['COM_y'][step_origin][:,np.newaxis]
+        z_origin = moltype_obj.data_dict['COM_z'][step_origin][:,np.newaxis]
 
         coords_origin =  np.concatenate((x_origin, y_origin, z_origin), axis=1)
 
-        for k, step in enumerate(range(i+1,i+n_steps+1)):
+        for k, step in enumerate(range(step_origin+1,step_origin+n_steps+1)):
             x = moltype_obj.data_dict['COM_x'][step][:,np.newaxis]
             y = moltype_obj.data_dict['COM_y'][step][:,np.newaxis]
             z = moltype_obj.data_dict['COM_z'][step][:,np.newaxis]
@@ -38,5 +41,3 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, type='c
             MSD[k,i] = MSD_values
     
     return MSD
-
-
