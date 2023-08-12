@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 from io import StringIO
 import pickle
-import time
 import sys
 import logging
 from misc import print_progress_bar
@@ -16,11 +15,12 @@ class DumpFileLoader:
     
     class MoleculeType:
         
-        def __init__(self, name, atom_types):
+        def __init__(self, name, atom_types, timesteps):
             self.data_dict = {}
             self.name = name
             self.atom_types = atom_types
             self.nummols = None
+            self.timesteps = timesteps
 
     def __init__(self, input_file, _sort_by_id=True):
         self.data_dict = {}
@@ -30,7 +30,6 @@ class DumpFileLoader:
         self.natoms = None
         self.nmols = None
         self.timesteps = []
-        # self.molnames = []
         self.molecule_types = []
         self._sort_by_id = _sort_by_id
         self._read_dump_data(input_file)
@@ -191,7 +190,7 @@ class DumpFileLoader:
         # Create new MoleculeType objects and populate them with selected coordinates
         for i, molname in enumerate(self.molnames):
             atom_types = mols_by_atom_types[i]
-            moltype = self.MoleculeType(molname, atom_types)
+            moltype = self.MoleculeType(molname, atom_types, self.timesteps)
             self.molecule_types.append(moltype)
             for keyword in self.data_dict.keys():
                 atom_types_mask = np.isin(self.data_dict['type'][0], atom_types)

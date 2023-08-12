@@ -3,10 +3,11 @@ import statsmodels.api as sm
 from DumpFileLoader import DumpFileLoader
 import logging
 import sys
+from sklearn.linear_model import LinearRegression
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(stream=sys.stdout, level=logging.CRITICAL, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, step_origin=10, type='com'):
+def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, as_key=True, step_origin=10, type='com'):
     # ----------------------------- 
     # Curently allows to compute MSD for center-of-mass of molecules
     # -----------------------------
@@ -40,4 +41,63 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, step_or
             MSD_values = d_sq_summed_atoms.sum()
             MSD[k,i] = MSD_values
     
-    return MSD
+    if as_key:
+        moltype_obj.data_dict['MSD'] = MSD
+    else:
+        return MSD    
+
+
+def calculate_diffusion_coefficient(moltype_obj, start_time=None, end_time=None):
+    MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
+    dump_freq = moltype_obj.timesteps[1] 
+    time = np.arange(1, MSD.shape[0]+1) * dump_freq
+
+    start_time, end_time = find_best_interval(moltype_obj)
+    
+    # # If both start_time and end_time are None, use entire time range (usually not a good idea)
+    # if end_time is None: end_time = len(time) + 1
+    # if start_time is None: start_time = 0
+    
+    lin_reg = LinearRegression()
+    lin_reg.fit(time[start_time:end_time].reshape(-1,1), MSD[start_time:end_time].reshape(-1,1))
+
+    diffusion_coefficient = lin_reg.coef_ / 6 * 1e15 * 1e-20 # m^2/s
+    return diffusion_coefficient    
+
+def find_best_interval(moltype_obj):
+    MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
+    dump_freq = moltype_obj.timesteps[1] 
+    time = np.arange(1, MSD.shape[0]+1) * dump_freq
+    # logging.debug(f'Time[-1]: {time[-1]}')
+
+    MSD_log = np.log10(MSD)
+    time_log = np.log10(time)
+
+    # Find best interval for slope estimation
+    scores = np.zeros(shape=((time[-5] - time[5]) // 10000,4)) # This is error-prone
+    # logging.debug(f'Scores shape: {scores.shape}')
+    for idx, start_time in enumerate(range(time[5],time[-5],10000)):
+    # for idx, start_time in enumerate(range(10_000,3_010_000,10000)):
+        mask = np.where((time > start_time) & (time < start_time + 1e6))[0]
+        start = mask.min()
+        end = mask.max()
+        
+        time_log_stats = sm.add_constant(time_log[start:end])
+        model = sm.OLS(MSD_log[start:end], time_log_stats)
+        results = model.fit()
+
+        scores[idx,0] = start
+        scores[idx,1] = end
+        scores[idx,2] = results.params[1] # Slope
+        scores[idx,3] = results.bse[1] # Standard error of slope estimation
+
+    # Find best score (slope of log-log plot closes to 1)
+    scores_sorted = scores[np.argsort(scores[:,2])] # Sort scores by slope
+    closest_to_one_idx = np.argmin(np.abs((scores_sorted[:,2] - 1))) # Find index of the slope closest to 1
+    best_time_interval = scores_sorted[closest_to_one_idx]
+    print(best_time_interval)
+    
+    start_time = int(best_time_interval[0])
+    end_time = int(best_time_interval[1])
+
+    return (start_time, end_time)
