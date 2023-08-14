@@ -7,14 +7,26 @@ from sklearn.linear_model import LinearRegression
 
 logging.basicConfig(stream=sys.stdout, level=logging.CRITICAL, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, as_key=True, step_origin=10, type='com'):
+def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, step_origin=1) -> (np.array,None):
+    '''Compute MSD of for a collection of molecules. Currently it uses molecular center-of-mass for computations. 
+    The function uses a number of steps equal to half the number of timesteps, in which the data was collected.
+    
+    Parameters:
+    ----------------------------
+    :param moltype_obj: MoleculeType object returned by get_molecule_type() method from DumpFileLoader class
+    :param as_key: Flag used to specify, whether an array of MSD should be returned or stored as a key-value pair in moltype_obj data dictionary
+    :param step_origin: Specifies, which timesteps provide the reference coordinates for MSD computation. For example if step_origin=1, then coordinates from
+    the beginning up to half the number of timesteps are considered as reference ones. If step_origin equals half the number of timesteps, then coordinates from only the first timestep are used.
+
+    Returns: 2-D array with dimensions (n_molecules x (number_of_timesteps / 2) / step_origin) filled with MSD for different molecules and different time origins.
+    '''
+   
     # ----------------------------- 
     # Curently allows to compute MSD for center-of-mass of molecules
     # -----------------------------
 
     n_steps = len(moltype_obj.timesteps) // 2
-    if n_origin is None:
-        n_origin = len(moltype_obj.timesteps) // 2
+    n_origin = len(moltype_obj.timesteps) // 2
     # elif n_origin > len(moltype_obj.timesteps) // 2:
     #     raise ValueError('n_origin cannot exceed half the number of timesteps ')
 
@@ -47,7 +59,19 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, n_origin=None, as_key=
         return MSD    
 
 
-def calculate_diffusion_coefficient(moltype_obj, start_time=None, end_time=None, find_best_interval_flag=True):
+def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, start_time: int = None, end_time: int = None, find_best_interval_flag: bool = True) -> tuple:
+    '''Calculate diffusion coefficient using Einstein approach.
+    
+    Parameters:
+    -----------------------
+    :param moltype_obj: MoleculeType object returned by get_molecule_type() method from DumpFileLoader class
+    :param start_time: The beginning of the time interval, for which the slope of MSD vs. time is estimated. If None, then start_time is equal to the beginning of the simulation time
+    :param end_time: The end of the time interval, for which the slope of MSD vs. time is estimated. If None, then end_time is equal to the last timestep, for which MSD was calculated
+    :param find_best_interval_flag: If True, apply a procedure for estimation of the best time interval based on log MSD vs. log time plot slope
+    
+    Reutrns: A tuple containing estimated diffusion coefficient, estimated slope of MSD vs. time and error of fit of the slope
+    '''
+
     MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
     dump_freq = moltype_obj.timesteps[1] 
     time = np.arange(1, MSD.shape[0]+1) * dump_freq
