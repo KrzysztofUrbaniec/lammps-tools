@@ -46,7 +46,7 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, step_orig
             y = moltype_obj.data_dict['COM_y'][step][:,np.newaxis]
             z = moltype_obj.data_dict['COM_z'][step][:,np.newaxis]
 
-            coords =  np.concatenate((x, y, z), axis=1)
+            coords =  np.concatenate((x, y, z), axis=1) # Consider using np.column_stack
             d = coords - coords_origin
             d_sq = d ** 2
             d_sq_summed_atoms = d_sq.mean(axis=0)
@@ -95,7 +95,7 @@ def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, st
     slope = results.params[1]
     slope_fit_error = results.bse[1]
     diffusion_coefficient = slope / 6 * 1e15 * 1e-20 # m^2/s
-    return (diffusion_coefficient, slope, slope_fit_error)
+    return (diffusion_coefficient, slope, slope_fit_error, start_time, end_time)
 
 def find_best_interval(moltype_obj):
     MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
@@ -121,7 +121,7 @@ def find_best_interval(moltype_obj):
         scores[idx,2] = results.params[1] # Slope
         scores[idx,3] = results.bse[1] # Standard error of slope estimation
 
-    # Find best score (slope of log-log plot closes to 1)
+    # Find best score (slope of log-log plot close to 1)
     scores_sorted = scores[np.argsort(scores[:,2])] # Sort scores by slope
     closest_to_one_idx = np.argmin(np.abs((scores_sorted[:,2] - 1))) # Find index of the slope closest to 1
     best_time_interval = scores_sorted[closest_to_one_idx]
