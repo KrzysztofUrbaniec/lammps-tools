@@ -16,9 +16,9 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, step_orig
     :param moltype_obj: MoleculeType object returned by get_molecule_type() method from DumpFileLoader class
     :param as_key: Flag used to specify, whether an array of MSD should be returned or stored as a key-value pair in moltype_obj data dictionary
     :param step_origin: Specifies, which timesteps provide the reference coordinates for MSD computation. For example if step_origin=1, then coordinates from
-    the beginning up to half the number of timesteps are considered as reference ones. If step_origin equals half the number of timesteps, then coordinates from only the first timestep are used.
+    the beginning up to half the number of timesteps are considered as reference ones. If step_origin equals half the number of timesteps, then coordinates from only the first timestep are used as reference ones.
 
-    Returns: 2-D array with dimensions (n_molecules x (number_of_timesteps / 2) / step_origin) filled with MSD for different molecules and different time origins.
+    Returns: 2-D array filled with MSD values for different molecules and different time origins.
     '''
    
     # ----------------------------- 
@@ -59,7 +59,7 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, step_orig
         return MSD    
 
 
-def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, start_time: int = None, end_time: int = None, find_best_interval_flag: bool = True) -> tuple:
+def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, start_time: int = None, end_time: int = None) -> tuple:
     '''Calculate diffusion coefficient using Einstein approach.
     
     Parameters:
@@ -75,14 +75,9 @@ def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, st
     MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
     dump_freq = moltype_obj.timesteps[1] 
     time = np.arange(1, MSD.shape[0]+1) * dump_freq
-
-    if find_best_interval_flag:
-        # Find the best interval based on log-log plot slope
-        start_time, end_time = find_best_interval(moltype_obj)
-    else:
-        # If both start_time and end_time are None, use entire time range (usually not a good idea)
-        if end_time is None: end_time = len(time) + 1
-        if start_time is None: start_time = 0
+  
+    if end_time is None: end_time = len(time) + 1
+    if start_time is None: start_time = 0
     
     time_interval = time[start_time:end_time]
     MSD_interval = MSD[start_time:end_time]
@@ -97,7 +92,10 @@ def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, st
     diffusion_coefficient = slope / 6 * 1e15 * 1e-20 # m^2/s
     return (diffusion_coefficient, slope, slope_fit_error, start_time, end_time)
 
-def find_best_interval(moltype_obj):
+def find_best_interval(moltype_obj, return_all=False):
+    # An attempt to find the best time interval for slope estimation using log time - log MSD plot
+    # Performs "scan" of the time interval seeking for the slope that is closer to 1 and returns corresponding time interval 
+
     MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
     dump_freq = moltype_obj.timesteps[1] 
     time = np.arange(1, MSD.shape[0]+1) * dump_freq
@@ -119,7 +117,6 @@ def find_best_interval(moltype_obj):
         scores[idx,0] = start
         scores[idx,1] = end
         scores[idx,2] = results.params[1] # Slope
-        scores[idx,3] = results.bse[1] # Standard error of slope estimation
 
     # Find best score (slope of log-log plot close to 1)
     scores_sorted = scores[np.argsort(scores[:,2])] # Sort scores by slope
@@ -129,4 +126,8 @@ def find_best_interval(moltype_obj):
     start_time = int(best_time_interval[0])
     end_time = int(best_time_interval[1])
 
-    return (start_time, end_time)
+    # Decide if entire array of scores has to be returned or only the "best" interval (look at the beginning of the function for meaning, which one is "best")
+    if return_all:
+        return scores_sorted
+    else:
+        return (start_time, end_time)
