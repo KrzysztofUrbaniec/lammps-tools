@@ -1,3 +1,4 @@
+'''The module contains constants and helper functions'''
 
 ELEMENT_TO_MASS_MAP = {
     'H': 1.008,
