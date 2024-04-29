@@ -1,79 +1,102 @@
 import numpy as np
 import statsmodels.api as sm
+
 from DumpFileLoader import DumpFileLoader
-import logging
-import sys
-from sklearn.linear_model import LinearRegression
 
-logging.basicConfig(stream=sys.stdout, level=logging.CRITICAL, format='%(asctime)s - %(levelname)s - %(message)s')
+def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, origin_step_interval=1) -> np.array:
+    '''Compute MSD (mean-square-displacement) for a collection of molecules. Currently it uses molecular center-of-mass for computations. 
+    
+    The code computes MSD a number of times, each time using a fixed number of steps equal to the half of the length of simulation time. 
+    Each computation starts with a time origin, which serves as a reference point, determining, where particular time intervals should begin.
+    This results in m vectors, where m is the number of time origins.
 
-def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, step_origin=1) -> (np.array,None):
-    '''Compute MSD of for a collection of molecules. Currently it uses molecular center-of-mass for computations. 
-    The function uses a number of steps equal to half the number of timesteps, in which the data was collected.
+    For example, if the number of timesteps in a simulation is equal to 20, the fixed number of steps is equal to 10. 
+    MSD vector is computed with respect to 0th timestep (origin) and has 10 elements corresponding to 10 timesteps after the origin (timesteps 1-10).
+    Then, next time origin is selected and the procedure is repeated.
     
     Parameters:
     ----------------------------
     :param moltype_obj: MoleculeType object returned by get_molecule_type() method from DumpFileLoader class
-    :param as_key: Flag used to specify, whether an array of MSD should be returned or stored as a key-value pair in moltype_obj data dictionary
-    :param step_origin: Specifies, which timesteps provide the reference coordinates for MSD computation. For example if step_origin=1, then coordinates from
-    the beginning up to half the number of timesteps are considered as reference ones. If step_origin equals half the number of timesteps, then coordinates from only the first timestep are used as reference ones.
 
-    Returns: 2-D array filled with MSD values for different molecules and different time origins.
+    :param as_key: Flag used to specify, whether an array of MSD should be returned as a separate object or stored as a key-value pair in moltype_obj data dictionary
+
+    :param origin_step_interval: Specifies, which timesteps provide the reference coordinates for MSD computation (how large is the step between successive time origins).
+    For example if origin_step_interval=10, them timesteps 0, 10, 20... will be considered as the reference ones.
+
+    Returns: 2-D array with MSD for different time origins (columns) and its evolution in time relative to particular origin (rows).
     '''
    
     # ----------------------------- 
-    # Curently allows to compute MSD for center-of-mass of molecules
+    # Curently allows to compute MSD for center-of-mass of molecules. 
     # -----------------------------
+
+    # Determine the number of time steps, during which the MSD is computed (n_steps) and the number of time origins (n_origins)
+    # Time origin is a timestep, which serves as the first timestep in a particular time interval
+    # The number of steps indicates, how many data points will be obtained from each interval (n_steps is set to be equal to half the simulation time)
 
     n_steps = len(moltype_obj.timesteps) // 2
     n_origin = len(moltype_obj.timesteps) // 2
-    # elif n_origin > len(moltype_obj.timesteps) // 2:
-    #     raise ValueError('n_origin cannot exceed half the number of timesteps ')
+  
+    # Arange an array of indices indicating time origins
+    origins = np.arange(0, n_origin, origin_step_interval, dtype=int)
 
-    origins = np.arange(0,n_origin,step_origin,dtype=int)
-
+    # n x k matrix, where n = step relative to particular initial timestep, k = initial timestep (reference)
+    # For example: element in the first second row and the first columns of the array indicates the MSD computed with reference to 1-st time
+    # origin (i.e. the beginning of the simulation time) and during the second timestep after the origin
+    # (i.e. the third timestep, during which the data was collected)
     MSD = np.zeros(shape=(n_steps, len(origins)))
 
-    for i, step_origin in enumerate(origins):
-        x_origin = moltype_obj.data_dict['COM_x'][step_origin][:,np.newaxis]
-        y_origin = moltype_obj.data_dict['COM_y'][step_origin][:,np.newaxis]
-        z_origin = moltype_obj.data_dict['COM_z'][step_origin][:,np.newaxis]
+    for i, timestep_origin in enumerate(origins):
+
+        # Get the x,y,z coordinates of molecular center-of-masses for initial time origin
+        x_origin = moltype_obj.data_dict['COM_x'][timestep_origin][:,np.newaxis]
+        y_origin = moltype_obj.data_dict['COM_y'][timestep_origin][:,np.newaxis]
+        z_origin = moltype_obj.data_dict['COM_z'][timestep_origin][:,np.newaxis]
 
         coords_origin =  np.concatenate((x_origin, y_origin, z_origin), axis=1)
 
-        for k, step in enumerate(range(step_origin+1,step_origin+n_steps+1)):
+        # Get the interval spanning half the simulation time 
+        next_timestep = timestep_origin + 1
+        last_timestep_in_range = timestep_origin + n_steps + 1
+        for k, step in enumerate(range(next_timestep, last_timestep_in_range)):
+
+            # Get the x,y,z coordinates of molecular center-of-masses for "step" time origin
             x = moltype_obj.data_dict['COM_x'][step][:,np.newaxis]
             y = moltype_obj.data_dict['COM_y'][step][:,np.newaxis]
             z = moltype_obj.data_dict['COM_z'][step][:,np.newaxis]
 
-            coords =  np.concatenate((x, y, z), axis=1) # Consider using np.column_stack
-            d = coords - coords_origin
-            d_sq = d ** 2
-            d_sq_summed_atoms = d_sq.mean(axis=0)
-            MSD_values = d_sq_summed_atoms.sum()
+            # Compute MSD
+            coords =  np.concatenate((x, y, z), axis=1)  # n x 3 matrix of center of mass coordinates
+            distance_squared = (coords - coords_origin) ** 2 # Compute square of the distance traveled by a molecule along particular axis
+            MSD_components = distance_squared.mean(axis=0) # Compute mean displacement along particular axis
+            MSD_values = MSD_components.sum() # Add x,y,z components to obtain total MSD
+
+            # Store MSD
             MSD[k,i] = MSD_values
     
-    if as_key:
+    if as_key is True:
         moltype_obj.data_dict['MSD'] = MSD
     else:
         return MSD    
 
 
-def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, start_time: int = None, end_time: int = None) -> tuple:
-    '''Calculate diffusion coefficient using Einstein approach.
+def compute_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, start_time: int = None, end_time: int = None) -> tuple:
+    '''Compute diffusion coefficient using Einstein approach.
     
     Parameters:
     -----------------------
     :param moltype_obj: MoleculeType object returned by get_molecule_type() method from DumpFileLoader class
-    :param start_time: The beginning of the time interval, for which the slope of MSD vs. time is estimated. If None, then start_time is equal to the beginning of the simulation time
-    :param end_time: The end of the time interval, for which the slope of MSD vs. time is estimated. If None, then end_time is equal to the last timestep, for which MSD was calculated
-    :param find_best_interval_flag: If True, apply a procedure for estimation of the best time interval based on log MSD vs. log time plot slope
+
+    :param start_time: The beginning of the time interval, for which the slope of MSD vs. time is estimated. If None, start_time is equal to the beginning of the simulation time
     
-    Reutrns: A tuple containing estimated diffusion coefficient, estimated slope of MSD vs. time and error of fit of the slope
+    :param end_time: The end of the time interval, for which the slope of MSD vs. time is estimated. If None, end_time is equal to the last timestep, for which MSD was calculated
+    
+    Reutrns: A tuple, which elements are: estimated diffusion coefficient, estimated slope of MSD vs. time and the standard error error of the slope
     '''
 
+    # Compute the mean with respect to particular referece timesteps (origins)
     MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
-    dump_freq = moltype_obj.timesteps[1] 
+    dump_freq = moltype_obj.timesteps[1] # How frequently molecular data was saved, i.e. the length of a timestep
     time = np.arange(1, MSD.shape[0]+1) * dump_freq
   
     if end_time is None: end_time = len(time) + 1
@@ -82,52 +105,13 @@ def calculate_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, st
     time_interval = time[start_time:end_time]
     MSD_interval = MSD[start_time:end_time]
 
-    # Build ordinary least squares model
+    # Build ordinary least squares model estimating the slope of the MSD curve in given time interval
     time_interval_stats = sm.add_constant(time_interval)
-    model = sm.OLS(MSD_interval, time_interval_stats)
-    results = model.fit()
+    model = sm.OLS(MSD_interval, time_interval_stats).fit()
     
-    slope = results.params[1]
-    slope_fit_error = results.bse[1]
-    diffusion_coefficient = slope / 6 * 1e15 * 1e-20 # m^2/s
-    return (diffusion_coefficient, slope, slope_fit_error, start_time, end_time)
+    # Extract slope and standard error of the slope
+    slope = model.params[1]
+    slope_fit_error = model.bse[1]
+    diffusion_coefficient = slope / 6 * 1e15 * 1e-20 # The constants convert the results to m^2/s
 
-def find_best_interval(moltype_obj, return_all=False):
-    # An attempt to find the best time interval for slope estimation using log time - log MSD plot
-    # Performs "scan" of the time interval seeking for the slope that is closer to 1 and returns corresponding time interval 
-
-    MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
-    dump_freq = moltype_obj.timesteps[1] 
-    time = np.arange(1, MSD.shape[0]+1) * dump_freq
-
-    MSD_log = np.log10(MSD)
-    time_log = np.log10(time)
-
-    # Find best interval for slope estimation
-    scores = np.zeros(shape=((time[-5] - time[5]) // 10000,4)) # This is error-prone
-    for idx, start_time in enumerate(range(time[5],time[-5],10000)):
-        mask = np.where((time > start_time) & (time < start_time + 1e6))[0]
-        start = mask.min()
-        end = mask.max()
-        
-        time_log_stats = sm.add_constant(time_log[start:end])
-        model = sm.OLS(MSD_log[start:end], time_log_stats)
-        results = model.fit()
-
-        scores[idx,0] = start
-        scores[idx,1] = end
-        scores[idx,2] = results.params[1] # Slope
-
-    # Find best score (slope of log-log plot close to 1)
-    scores_sorted = scores[np.argsort(scores[:,2])] # Sort scores by slope
-    closest_to_one_idx = np.argmin(np.abs((scores_sorted[:,2] - 1))) # Find index of the slope closest to 1
-    best_time_interval = scores_sorted[closest_to_one_idx]
-    
-    start_time = int(best_time_interval[0])
-    end_time = int(best_time_interval[1])
-
-    # Decide if entire array of scores has to be returned or only the "best" interval (look at the beginning of the function for meaning, which one is "best")
-    if return_all:
-        return scores_sorted
-    else:
-        return (start_time, end_time)
+    return (diffusion_coefficient, slope, slope_fit_error)
