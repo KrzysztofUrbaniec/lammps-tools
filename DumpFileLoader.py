@@ -1,16 +1,13 @@
-import pandas as pd
-import numpy as np
 from io import StringIO
+import numpy as np
+import pandas as pd
 import pickle
-import sys
-import logging
+
 from misc import print_progress_bar
- 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class DumpFileLoader:
     '''
-    Class for handling LAMMPS dump files, currently for atom and custom dump styles.
+    Class created for convenient work with LAMMPS dump files, currently for atom and custom dump styles.
     '''
     
     class MoleculeType:
@@ -54,6 +51,8 @@ class DumpFileLoader:
                 data_encountered = False
                 self.timesteps.append(int(contents[i+1])) # Collect timestep
             
+            # Collect the data
+            # LAMMPS output has a well-defined structure, which allows to "cut" appropriate segments of data
             if data_encountered:
                 partial_data = contents[i:i + self.natoms]
                 partial_data_table = pd.read_table(StringIO(' '.join(partial_data)),
@@ -87,20 +86,20 @@ class DumpFileLoader:
                 self.data_dict[keyword] = np.empty(shape=(0,self.natoms))
                 
     def get_property(self, name: str) -> np.array:
-        '''Get an array of selected property values collected from dump file and grouped by timestep.
-        If the array is A, then element A(i,j) gives value of selected property for j-th atom at i-th timestep.
+        '''Get an array of selected properties collected from dump file.
+        If the array is A, then element A(i,j) gives the value of selected property for j-th atom at i-th timestep.
         
         Parameters:
         ------------------------
         :param name: name of the property form the dump file
         
-        Returns: An array with selected property values
+        Returns: An array with selected properties
         '''
         
         if name in self.data_dict.keys():
             return self.data_dict[name]
         else:
-            print("Entered property doesn't exist.")
+            print(f"Property {name} doesn't exist.")
             return None
 
     def get_molecule_type(self, molname: str) -> MoleculeType: 
@@ -116,10 +115,10 @@ class DumpFileLoader:
         for mol in self.molecule_types:
             if mol.name == molname:
                 return mol
-        print('Molecule type with given name is not defined.')
+        print(f'No molecule with name: {molname} was defined.')
 
     def get_coordinates_array(self) -> dict:
-        '''Get arrays of coordinates loaded from the dump file grouped by timestep.'''
+        '''Get coordinates loaded from the dump file and grouped by timestep.'''
 
         # Select only coordinates but allow for different types
         target_coord_names = ['x', 'y', 'z', 'xs', 'ys', 'zs', 'xu', 'yu', 'zu']
@@ -128,7 +127,7 @@ class DumpFileLoader:
         return coordinates_dict
     
     def get_custom_array(self, property_names: list) -> dict:
-        '''Get arrays consisting of selected properties and grouped by timestep.
+        '''Get arrays of selected properties and grouped by timestep.
         
         Parameters:
         ------------------------
@@ -150,13 +149,13 @@ class DumpFileLoader:
 
     def recognize_molecules(self, mols_by_atom_types: list, molnames: list = None) -> None:
         '''Recognize molecule types using provided atom types. Works only if each molecule is defined by separate set of atom types, not overlapping with other molecules.
-        Atom types are paired with molecule names in the same order as they appear in arguments of the method. Each molecule type is stored as an object of separate class.
+        Atom types are paired with molecule names in the same order as they appear in the arguments of the method. Each molecule type is stored as an object of a separate class.
         These objects can be requested by user with get_molecule_type() method.
 
         Parameters:
         ------------------------
-        :param mol_by_atom_types: List-of-lists or tuple-of-lists containing sets of atom types defining specific molecules
-        :param molnames: List or tuple containing set of molecule names
+        :param mol_by_atom_types: List-of-lists or tuple-of-lists containing sets of atom types defining the molecules
+        :param molnames: List or tuple with a set of molecule names
 
         Returns: None, dump object is modified inplace 
         '''
@@ -168,7 +167,7 @@ class DumpFileLoader:
     
         # Check if all molnames are unique
         if len(molnames) != len(set(molnames)):
-            raise Exception('All molnames must be unique.')
+            raise ValueError('All molnames must be unique.')
 
         # If this function had been used before and is used once again, erase previously created keys
         if len(self.molecule_types) != 0:
