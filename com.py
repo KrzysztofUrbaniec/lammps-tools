@@ -1,12 +1,10 @@
-from misc import print_progress_bar, ELEMENT_TO_MASS_MAP
-from DumpFileLoader import DumpFileLoader
 import numpy as np
-import logging
-import sys
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from DumpFileLoader import DumpFileLoader
+from misc import print_progress_bar, ELEMENT_TO_MASS_MAP
 
 def compute_COM(moltype: DumpFileLoader.MoleculeType, mol_geom_array: np.array, timestep: int, atom_mass_map: dict, element_present: bool) -> np.array:
+    # Initialize array of center-of-mass coordinates
     mol_geom_com = np.zeros(shape=(len(mol_geom_array), 3))
     
     total_mass = 0
@@ -20,14 +18,16 @@ def compute_COM(moltype: DumpFileLoader.MoleculeType, mol_geom_array: np.array, 
     return mol_geom_com.sum(axis=0) / total_mass
     
 def convert_to_com(dump_obj: DumpFileLoader, type_to_mass_map: dict = None) -> None: 
-    '''Convert atomic coordinates to molecular center-of-mass for defined types of molecules. Requires definitions of molecules (created through recognize_molecules() from DumpDataLoader) and
-    presence of 'mol' property in dump data file.
+    '''Convert atomic coordinates to molecular center-of-mass coordinats for defined types of molecules. 
+   
+    Requires definitions of molecules (created with recognize_molecules() from DumpDataLoader) and presence of 'mol' property in dump data file.
     
     Parameters:
     ----------------------
     :param dump_obj: DumpDataLoader object
-    :param type_to_mass_map: Dictionary specifying rule for mapping between atom types and atom masses. If it's not provided, then the function tries to map using element-based masses. 
-    If 'element' property was not present in the dump file and type_to_mass_map is not specified, an error is raised.
+
+    :param type_to_mass_map: A dictionary with the rules defining a mapping between atom types and atom masses. 
+    If not provided, the function tries to create a map using element-based masses. If 'element' property was not present in the dump file and type_to_mass_map is not specified, an error is raised.
 
     Returns: None, molecule type objects are modified inplace.
     '''
@@ -55,7 +55,7 @@ def convert_to_com(dump_obj: DumpFileLoader, type_to_mass_map: dict = None) -> N
         atom_mass_map = type_to_mass_map
         
     if not element_present and type_to_mass_map is None:
-        print('Element not provided in dump file and type to mass map is not defined')
+        print('Element was not provided in the dump file and type to mass map is not defined')
         raise Exception('No rule for atom to mass mapping.')
     if not element_present and type_to_mass_map is not None:
         atom_mass_map = type_to_mass_map
@@ -65,7 +65,6 @@ def convert_to_com(dump_obj: DumpFileLoader, type_to_mass_map: dict = None) -> N
     com_list = ['COM_x', 'COM_y', 'COM_z']
 
     for moltype in dump_obj.molecule_types:
-        # logging.debug(moltype.data_dict.keys())
         
         for com_name in com_list:
             moltype.data_dict[com_name] = np.empty(shape=(0,moltype.nummols))
@@ -74,18 +73,20 @@ def convert_to_com(dump_obj: DumpFileLoader, type_to_mass_map: dict = None) -> N
         
         for timestep_idx in range(len(dump_obj.timesteps)):
             
-            # Now it assumes that the simulation is 3D
+            # It assumes that the simulation is 3D
             x = recognize_coordinate(moltype, timestep_idx, ['x','xs','xu'])
             y = recognize_coordinate(moltype, timestep_idx, ['y','ys','yu'])
             z = recognize_coordinate(moltype, timestep_idx, ['z','zs','zu'])
 
-            # This array contains sets of three atomic coordinates
+            # Array containing sets of three atomic coordinates
             # Its dimensions are (n_atoms x 3), each row corresponds to one atom
             mol_geom_array = np.concatenate((x,y,z), axis=1)
 
+            # We want to compute COM for each molecule separately; start_mol and end_mol contain the first and the last molecule id
             start_mol, end_mol = (moltype.data_dict['mol'][timestep_idx].min().astype(np.int32),
                                 moltype.data_dict['mol'][timestep_idx].max().astype(np.int32))
             com_array = np.zeros(shape=(moltype.nummols,3))
+
             for i in range(start_mol, end_mol+1):
                 mol_mask = np.where(moltype.data_dict['mol'][timestep_idx] == i)[0] # Mask for atoms belonging to specific molecule
                 molecule_com = compute_COM(moltype, mol_geom_array[mol_mask], timestep_idx, atom_mass_map, element_present)
