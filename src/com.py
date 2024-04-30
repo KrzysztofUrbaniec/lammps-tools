@@ -1,7 +1,7 @@
 import numpy as np
 
-from DumpFileLoader import DumpFileLoader
-from misc import print_progress_bar, ELEMENT_TO_MASS_MAP
+from src.DumpFileLoader import DumpFileLoader
+from src.misc import print_progress_bar, ELEMENT_TO_MASS_MAP
 
 def compute_COM(moltype: DumpFileLoader.MoleculeType, mol_geom_array: np.array, timestep: int, atom_mass_map: dict, element_present: bool) -> np.array:
     # Initialize array of center-of-mass coordinates

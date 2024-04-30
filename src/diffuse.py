@@ -1,7 +1,7 @@
 import numpy as np
 import statsmodels.api as sm
 
-from DumpFileLoader import DumpFileLoader
+from src.DumpFileLoader import DumpFileLoader
 
 def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, origin_step_interval=1) -> np.array:
     '''Compute MSD (mean-square-displacement) for a collection of molecules. Currently it uses molecular center-of-mass for computations. 

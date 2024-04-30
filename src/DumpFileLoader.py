@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pickle
 
-from misc import print_progress_bar
+from src.misc import print_progress_bar
 
 class DumpFileLoader:
     '''
