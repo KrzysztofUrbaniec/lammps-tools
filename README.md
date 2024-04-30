@@ -6,7 +6,7 @@ The code in the repository consists of a few tools I created to compute necessar
 
 The structure of the tools is based on a class called DumpFileLoader, which is used to load the data from the simulation output (LAMMPS dump file) into the memory. Objects of this class are utilized later in various functions to facilitate data processing and computations. 
 
-All source files are located in the /src directory. There is also a file "LoaderDemo.ipynb", which contains the description of particular functions and examples of their application.
+All source files are located in the /src directory. In the root directory there is also a file "LoaderDemo.ipynb", which contains the description of particular functions and examples of their application.
 
 ## Citation
 
