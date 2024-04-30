@@ -19,6 +19,23 @@ class DumpFileLoader:
             self.nummols = None
             self.timesteps = timesteps
 
+        def get_property(self, name: str) -> np.array:
+            '''Get an array of selected properties specific to a collection of molecules of particular type.
+            If the array is A, then element A(i,j) gives the value of selected property for j-th atom at i-th timestep.
+            
+            Parameters:
+            ------------------------
+            :param name: name of the property
+            
+            Returns: An array with selected properties
+            '''
+            
+            if name in self.data_dict.keys():
+                return self.data_dict[name]
+            else:
+                print(f"Property {name} doesn't exist.")
+                return None
+
     def __init__(self, input_file, _sort_by_id=True):
         self.data_dict = {}
         self.keywords = []
@@ -210,7 +227,9 @@ class DumpFileLoader:
             filename = filename + '.pkl'
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
+            print(f'The object has been saved to: {filename}')
             
+    @staticmethod
     def load_saved_state(filepath: str):
         '''Deserialize dump object and load previously saved state. The method is provided with
         class for convenience, but it can load any serialized .pkl object and is not restriced to dump objects.
