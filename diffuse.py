@@ -81,7 +81,7 @@ def compute_MSD(moltype_obj: DumpFileLoader.MoleculeType, as_key=True, origin_st
 
 
 def compute_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, start_time: int = None, end_time: int = None) -> tuple:
-    '''Compute diffusion coefficient using Einstein approach.
+    '''Compute diffusion coefficient using Einstein approach. The result is returned in units of m^2/s
     
     Parameters:
     -----------------------
@@ -89,7 +89,7 @@ def compute_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, star
 
     :param start_time: The beginning of the time interval, for which the slope of MSD vs. time is estimated. If None, start_time is equal to the beginning of the simulation time
     
-    :param end_time: The end of the time interval, for which the slope of MSD vs. time is estimated. If None, end_time is equal to the last timestep, for which MSD was calculated
+    :param end_time: The end of the time interval, for which the slope of MSD vs. time is estimated. If None, end_time is equal to the last timestep, for which MSD was computed
     
     Reutrns: A tuple, which elements are: estimated diffusion coefficient, estimated slope of MSD vs. time and the standard error error of the slope
     '''
@@ -97,13 +97,13 @@ def compute_diffusion_coefficient(moltype_obj: DumpFileLoader.MoleculeType, star
     # Compute the mean with respect to particular referece timesteps (origins)
     MSD = moltype_obj.data_dict['MSD'].mean(axis=1)
     dump_freq = moltype_obj.timesteps[1] # How frequently molecular data was saved, i.e. the length of a timestep
-    time = np.arange(1, MSD.shape[0]+1) * dump_freq
+    time = np.arange(1, MSD.shape[0] + 1) * dump_freq
   
-    if end_time is None: end_time = len(time) + 1
+    if end_time is None: end_time = len(time)
     if start_time is None: start_time = 0
     
-    time_interval = time[start_time:end_time]
-    MSD_interval = MSD[start_time:end_time]
+    time_interval = time[start_time:end_time + 1]
+    MSD_interval = MSD[start_time:end_time + 1]
 
     # Build ordinary least squares model estimating the slope of the MSD curve in given time interval
     time_interval_stats = sm.add_constant(time_interval)
